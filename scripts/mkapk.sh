@@ -30,7 +30,14 @@ install -Dm644 "$ROOT/openwrt/wrtai/files/wrtai.uci" "$STAGE/etc/config/wrtai"
 install -dm755 "$STAGE/etc/wrtai"
 
 # Unsigned package: install with `apk add --allow-untrusted`.
-SOURCE_DATE_EPOCH=0 fakeroot "$APK" mkpkg \
+# Ownership matters (APKv3 records uid/gid): run as real root when
+# possible; fakeroot only works for dynamically linked apk builds.
+if [ "$(id -u)" = "0" ]; then
+  WRAP=""
+else
+  WRAP="fakeroot"
+fi
+SOURCE_DATE_EPOCH=0 $WRAP "$APK" mkpkg \
   --info "name:wrtai" \
   --info "version:${VER}-r1" \
   --info "description:WRT AI - AI assistant that operates your OpenWRT router (status/logs/diagnostics/UCI config via chat)" \

@@ -34,24 +34,26 @@ jobs:
       - name: Build .apk packages (OpenWrt 25.12+)
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
           mkdir -p apktool && cd apktool
           curl -fsSL -o apktools.apk "$APK_TOOLS_STATIC_URL"
           tar -xzf apktools.apk sbin/apk.static
           chmod +x sbin/apk.static
           cd ..
+          # sudo: the static apk binary ignores fakeroot, so run mkpkg as
+          # real root to record root ownership inside the package
           declare -A ARCHES=( [amd64]=x86_64 [arm64]=aarch64_generic [mips]=mips_24kc [mipsle]=mipsel_24kc )
           for goarch in amd64 arm64 mips mipsle; do
-            ./scripts/mkapk.sh "dist/linux-$goarch/wrtai" "${ARCHES[$goarch]}" "$VERSION" dist "apktool/sbin/apk.static"
+            sudo ./scripts/mkapk.sh "dist/linux-$goarch/wrtai" "${ARCHES[$goarch]}" "$VERSION" dist "apktool/sbin/apk.static"
           done
 
       - name: Verify .apk installs into a clean root
         run: |
           mkdir -p testroot
-          fakeroot apktool/sbin/apk.static --allow-untrusted --root testroot --initdb --arch x86_64 add dist/wrtai-x86_64-*.apk
+          sudo apktool/sbin/apk.static --allow-untrusted --root testroot --initdb --arch x86_64 add dist/wrtai-x86_64-*.apk
           test -x testroot/usr/bin/wrtai
           test -x testroot/etc/init.d/wrtai
           test -f testroot/etc/config/wrtai
+          test "$(stat -c %u testroot/usr/bin/wrtai)" = "0"
           echo "apk install verified"
 
       - name: Package tarballs
