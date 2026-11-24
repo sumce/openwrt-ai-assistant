@@ -10,6 +10,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Alpine's static apk-tools v3 — same APKv3 format OpenWrt 25.12+ uses.
+      APK_TOOLS_STATIC_URL: https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/apk-tools-static-3.0.11-r0.apk
     steps:
       - uses: actions/checkout@v4
 
@@ -24,15 +27,41 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Build all architectures
-        run: make cross
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          make cross VERSION="$VERSION"
 
-      - name: Package
+      - name: Build .apk packages (OpenWrt 25.12+)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
+          mkdir -p apktool && cd apktool
+          curl -fsSL -o apktools.apk "$APK_TOOLS_STATIC_URL"
+          tar -xzf apktools.apk sbin/apk.static
+          chmod +x sbin/apk.static
+          cd ..
+          declare -A ARCHES=( [amd64]=x86_64 [arm64]=aarch64_generic [mips]=mips_24kc [mipsle]=mipsel_24kc )
+          for goarch in amd64 arm64 mips mipsle; do
+            ./scripts/mkapk.sh "dist/linux-$goarch/wrtai" "${ARCHES[$goarch]}" "$VERSION" dist "apktool/sbin/apk.static"
+          done
+
+      - name: Verify .apk installs into a clean root
+        run: |
+          mkdir -p testroot
+          fakeroot apktool/sbin/apk.static --allow-untrusted --root testroot --initdb --arch x86_64 add dist/wrtai-x86_64-*.apk
+          test -x testroot/usr/bin/wrtai
+          test -x testroot/etc/init.d/wrtai
+          test -f testroot/etc/config/wrtai
+          echo "apk install verified"
+
+      - name: Package tarballs
         run: |
           cd dist
+          VERSION="${GITHUB_REF_NAME#v}"
           for d in linux-*; do
-            tar -czf "wrtai-${d}-${GITHUB_REF_NAME}.tar.gz" -C "$d" wrtai
+            tar -czf "wrtai-${d}-${VERSION}.tar.gz" -C "$d" wrtai
           done
-          sha256sum wrtai-*.tar.gz > checksums.txt
+          sha256sum *.tar.gz *.apk > checksums.txt
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -40,4 +69,5 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.tar.gz
+            dist/*.apk
             dist/checksums.txt
