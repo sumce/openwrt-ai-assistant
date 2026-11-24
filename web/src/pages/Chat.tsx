@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Button, Empty, Input, Message, Tag } from '@arco-design/web-react'
-import { IconSend } from '@arco-design/web-react/icon'
 import { api } from '../api'
 import { useApp } from '../store'
 import { RunStream } from '../components/RunStream'
 import { EntryItem, LiveSegItem, mergeEvent, type LiveSeg } from '../components/MessageItem'
-import type { Entry, RunEvent, RunSnapshot } from '../types'
-
-const { TextArea } = Input
+import { Button, Empty, IconSend, IconStop, Message, Spinner, Tag, TextArea } from '../ui'
+import type { RunEvent, RunSnapshot } from '../types'
 
 const HINTS = [
   '查看路由器状态',
@@ -19,7 +16,7 @@ const HINTS = [
 export default function Chat() {
   const { conversations, currentConvId, setCurrentConv, loadConversations } = useApp()
 
-  const [entries, setEntries] = useState<Entry[]>([])
+  const [entries, setEntries] = useState<any[]>([])
   const [segs, setSegs] = useState<LiveSeg[]>([])
   const [runId, setRunId] = useState<string | null>(null)
   const [runState, setRunState] = useState<string>('')
@@ -31,6 +28,7 @@ export default function Chat() {
   const runIdRef = useRef<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickBottom = useRef(true)
+  const [composerFocus, setComposerFocus] = useState(false)
 
   convIdRef.current = currentConvId
   runIdRef.current = runId
@@ -55,8 +53,6 @@ export default function Chat() {
     loadConversations()
   }
 
-  // handler is created once; it only touches refs and setState updaters so
-  // there are no stale-closure issues.
   if (!streamRef.current) {
     streamRef.current = new RunStream((e: RunEvent) => {
       switch (e.type) {
@@ -80,7 +76,6 @@ export default function Chat() {
     })
   }
 
-  // Selecting a conversation: load transcript, reattach any active run.
   const selectConv = async (id: string | null) => {
     setCurrentConv(id)
     setSegs([])
@@ -97,8 +92,6 @@ export default function Chat() {
       if (match) {
         setRunId(match.id)
         setRunState(match.state)
-        // Seed the approval card from the snapshot (covers restart cases
-        // where the SSE replay buffer is empty); dedupe happens in merge.
         if (match.pending && match.state === 'waiting_approval') {
           setSegs((prev) =>
             mergeEvent(prev, { seq: -1, type: 'approval_request', pending: match.pending! }),
@@ -111,27 +104,41 @@ export default function Chat() {
     }
   }
 
-  // Reattach on first mount (e.g. browser refresh mid-run).
+  // On mount: reattach an in-flight run, otherwise open the most recent
+  // conversation so a refresh doesn't look like data loss.
   useEffect(() => {
-    (async () => {
+    ;(async () => {
+      let attached = false
       try {
         const active: RunSnapshot[] = await api.activeRuns()
-        if (active.length === 0) return
         const match =
-          active.find((a) => a.conversation_id === currentConvId) || active[active.length - 1]
-        setCurrentConv(match.conversation_id)
-        setEntries(await api.messages(match.conversation_id))
-        setRunId(match.id)
-        setRunState(match.state)
-        convIdRef.current = match.conversation_id
-        if (match.pending && match.state === 'waiting_approval') {
-          setSegs((prev) =>
-            mergeEvent(prev, { seq: -1, type: 'approval_request', pending: match.pending! }),
-          )
+          active.length > 0 &&
+          (active.find((a) => a.conversation_id === currentConvId) || active[active.length - 1])
+        if (match) {
+          attached = true
+          setCurrentConv(match.conversation_id)
+          setEntries(await api.messages(match.conversation_id))
+          setRunId(match.id)
+          setRunState(match.state)
+          convIdRef.current = match.conversation_id
+          if (match.pending && match.state === 'waiting_approval') {
+            setSegs((prev) =>
+              mergeEvent(prev, { seq: -1, type: 'approval_request', pending: match.pending! }),
+            )
+          }
+          streamRef.current!.resume(match.id, 0)
         }
-        streamRef.current!.resume(match.id, 0)
       } catch {
         /* ignore */
+      }
+      if (!attached && !currentConvId) {
+        try {
+          await loadConversations()
+          const list = useApp.getState().conversations
+          if (list.length > 0) await selectConv(list[0].id)
+        } catch {
+          /* ignore */
+        }
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,7 +148,7 @@ export default function Chat() {
     const text = input.trim()
     if (!text || runIdRef.current) return
     setInput('')
-    const optimistic: Entry = { t: 'user', text, ts: Math.floor(Date.now() / 1000) }
+    const optimistic: any = { t: 'user', text, ts: Math.floor(Date.now() / 1000) }
     setEntries((prev) => [...prev, optimistic])
     try {
       const res = await api.chat(currentConvId, text)
@@ -187,7 +194,7 @@ export default function Chat() {
     }
   }
 
-  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       send()
@@ -213,52 +220,65 @@ export default function Chat() {
       <div className="chat-header">
         <span className="chat-title">{conv ? conv.title : '新会话'}</span>
         {runState === 'waiting_approval' && <Tag color="orange">等待确认</Tag>}
-        {running && runState === 'running' && <Tag color="arcoblue">执行中</Tag>}
+        {running && runState === 'running' && <Tag color="blue">执行中</Tag>}
       </div>
 
       <div className="chat-scroll" ref={scrollRef} onScroll={onScroll}>
-        {entries.length === 0 && segs.length === 0 ? (
-          <div className="chat-empty">
-            <Empty description="和你的路由器聊聊吧" />
-            <div className="hints">
-              {HINTS.map((h) => (
-                <span key={h} className="hint-chip" onClick={() => setInput(h)}>
-                  {h}
-                </span>
-              ))}
+        <div className="chat-inner">
+          {entries.length === 0 && segs.length === 0 ? (
+            <div className="chat-empty">
+              <Empty description="和你的路由器聊聊吧" />
+              <div className="hints">
+                {HINTS.map((h) => (
+                  <span key={h} className="hint-chip" onClick={() => setInput(h)}>
+                    {h}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            {entries.map((e, i) => (
-              <EntryItem key={`e${i}`} e={e} />
-            ))}
-            {segs.map((s, i) => (
-              <LiveSegItem key={`s${i}`} seg={s} onApprove={approve} busy={approving} />
-            ))}
-          </>
-        )}
+          ) : (
+            <>
+              {entries.map((e, i) => (
+                <EntryItem key={`e${i}`} e={e} />
+              ))}
+              {segs.map((s, i) => (
+                <LiveSegItem key={`s${i}`} seg={s} onApprove={approve} busy={approving} />
+              ))}
+            </>
+          )}
+        </div>
       </div>
 
+      {/* floating composer */}
       <div className="composer">
-        <TextArea
-          placeholder={running ? '任务执行中…' : '输入消息，Enter 发送，Shift+Enter 换行'}
-          autoSize={{ minRows: 1, maxRows: 5 }}
-          value={input}
-          onChange={setInput}
-          onKeyDown={onKeyDown}
-          disabled={running}
-        />
-        <div className="composer-actions">
-          {running ? (
-            <Button status="warning" onClick={cancel}>
-              停止
-            </Button>
-          ) : (
-            <Button type="primary" icon={<IconSend />} disabled={!input.trim()} onClick={send}>
-              发送
-            </Button>
-          )}
+        <div className={`composer-card${composerFocus ? ' focused' : ''}`}>
+          <TextArea
+            placeholder={running ? '任务执行中…' : '输入消息，Enter 发送，Shift+Enter 换行'}
+            value={input}
+            onChange={setInput}
+            onKeyDown={onKeyDown}
+            disabled={running}
+            autoFocus
+          />
+          <div className="composer-actions">
+            {running ? (
+              <>
+                <span className="composer-hint">
+                  <Spinner size={13} /> AI 正在工作…
+                </span>
+                <Button status="warning" icon={<IconStop size={14} />} onClick={cancel}>
+                  停止
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="composer-hint">Enter 发送 · Shift+Enter 换行</span>
+                <Button type="primary" icon={<IconSend size={14} />} disabled={!input.trim()} onClick={send}>
+                  发送
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

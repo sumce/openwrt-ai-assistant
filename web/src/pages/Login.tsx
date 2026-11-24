@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Button, Input, Message } from '@arco-design/web-react'
 import { api } from '../api'
 import { useApp } from '../store'
+import { Button, Message, PasswordInput } from '../ui'
 
 export default function Login() {
   const { initialized, setAuthed, loadConversations } = useApp()
@@ -63,31 +63,15 @@ export default function Login() {
         ) : mode === 'setup' ? (
           <>
             <div className="login-hint">首次使用，请设置管理密码</div>
-            <Input.Password
-              placeholder="管理密码（至少 6 位）"
-              value={pw}
-              onChange={setPw}
-              onPressEnter={submit}
-            />
-            <Input.Password
-              placeholder="确认密码"
-              value={pw2}
-              onChange={setPw2}
-              onPressEnter={submit}
-            />
+            <PasswordInput placeholder="管理密码（至少 6 位）" value={pw} onChange={setPw} onPressEnter={submit} />
+            <PasswordInput placeholder="确认密码" value={pw2} onChange={setPw2} onPressEnter={submit} />
             <Button type="primary" long loading={loading} onClick={submit}>
               开始使用
             </Button>
           </>
         ) : (
           <>
-            <Input.Password
-              placeholder="管理密码"
-              value={pw}
-              onChange={setPw}
-              onPressEnter={submit}
-              autoFocus
-            />
+            <PasswordInput placeholder="管理密码" value={pw} onChange={setPw} onPressEnter={submit} autoFocus />
             <Button type="primary" long loading={loading} onClick={submit}>
               登录
             </Button>

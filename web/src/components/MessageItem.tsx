@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Alert, Button, Spin, Tag } from '@arco-design/web-react'
-import { IconCaretRight, IconCaretDown, IconCheckCircleFill, IconCloseCircleFill, IconExclamationCircleFill } from '@arco-design/web-react/icon'
+import { Spinner, Tag } from '../ui'
 import Markdown from './Markdown'
 import type { Entry, PendingAction, RunEvent } from '../types'
 
@@ -21,20 +20,27 @@ export function EntryItem({ e }: { e: Entry }) {
         </div>
       )
     case 'tool':
-      return <ToolCard tool={e.tool || ''} desc={e.desc || ''} result={e.result} ok={e.result ? !isFailResult(e.result) : undefined} />
+      return (
+        <ToolCard
+          tool={e.tool || ''}
+          desc={e.desc || ''}
+          result={e.result}
+          ok={e.result ? !isFailResult(e.result) : undefined}
+        />
+      )
     case 'approval':
       return (
         <div className="approval-log">
           {e.approved ? (
-            <Tag color="green" size="small">已批准</Tag>
+            <Tag color="green">已批准</Tag>
           ) : (
-            <Tag color="red" size="small">已拒绝</Tag>
+            <Tag color="red">已拒绝</Tag>
           )}
           <span className="approval-desc">{e.desc}</span>
         </div>
       )
     case 'error':
-      return <Alert type="error" content={e.text || '出错了'} style={{ margin: '8px 0' }} />
+      return <div className="alert alert-error">{e.text || '出错了'}</div>
     default:
       return null
   }
@@ -53,16 +59,16 @@ export function ToolCard({ tool, desc, result, ok }: { tool: string; desc: strin
       <div className="tool-head" onClick={() => expandable && setOpen(!open)}>
         <span className="tool-icon">
           {running ? (
-            <Spin size={14} />
+            <Spinner size={14} />
           ) : ok ? (
-            <IconCheckCircleFill style={{ color: 'var(--color-success-6)', fontSize: 14 }} />
+            <span className="ico-ok">✓</span>
           ) : (
-            <IconCloseCircleFill style={{ color: 'var(--color-danger-6)', fontSize: 14 }} />
+            <span className="ico-fail">✕</span>
           )}
         </span>
-        <Tag size="small" color="arcoblue">{tool}</Tag>
+        <Tag color="blue">{tool}</Tag>
         <span className="tool-desc">{desc}{running ? ' …' : ''}</span>
-        {expandable && (open ? <IconCaretDown className="tool-caret" /> : <IconCaretRight className="tool-caret" />)}
+        {expandable && <span className="tool-caret">{open ? '▾' : '▸'}</span>}
       </div>
       {open && result && <pre className="tool-result">{result}</pre>}
     </div>
@@ -91,9 +97,9 @@ export function LiveSegItem({ seg, onApprove, busy }: { seg: LiveSeg; onApprove:
   return (
     <div className="approval-card">
       <div className="approval-head">
-        <IconExclamationCircleFill style={{ color: 'var(--color-warning-6)' }} />
+        <span className="ico-warn">⚠</span>
         <b>需要你确认</b>
-        <Tag size="small" color={seg.pending.level === 'dangerous' ? 'red' : 'orange'}>
+        <Tag color={seg.pending.level === 'dangerous' ? 'red' : 'orange'}>
           {seg.pending.level === 'dangerous' ? '危险操作' : '写操作'}
         </Tag>
       </div>
@@ -102,7 +108,7 @@ export function LiveSegItem({ seg, onApprove, busy }: { seg: LiveSeg; onApprove:
         <div className="approval-configs">
           影响配置：
           {seg.pending.configs.map((c) => (
-            <Tag key={c} size="small">{c}</Tag>
+            <Tag key={c}>{c}</Tag>
           ))}
         </div>
       )}
@@ -111,12 +117,12 @@ export function LiveSegItem({ seg, onApprove, busy }: { seg: LiveSeg; onApprove:
       )}
       {d === null ? (
         <div className="approval-actions">
-          <Button type="primary" status="success" size="small" loading={busy} onClick={() => onApprove(true)}>
+          <button className="btn btn-primary btn-success" disabled={busy} onClick={() => onApprove(true)}>
             批准执行
-          </Button>
-          <Button status="danger" size="small" disabled={busy} onClick={() => onApprove(false)}>
+          </button>
+          <button className="btn btn-danger" disabled={busy} onClick={() => onApprove(false)}>
             拒绝
-          </Button>
+          </button>
         </div>
       ) : (
         <div className="approval-actions">

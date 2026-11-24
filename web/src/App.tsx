@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { Layout, Spin } from '@arco-design/web-react'
 import Sidebar from './Sidebar'
 import Chat from './pages/Chat'
 import Login from './pages/Login'
 import Settings from './pages/Settings'
+import { ToastHost } from './ui'
 import { useApp } from './store'
 
 export default function App() {
@@ -16,16 +16,17 @@ export default function App() {
   if (authed === null) {
     return (
       <div className="boot">
-        <Spin size={32} />
+        <span className="spin" style={{ width: 32, height: 32 }} />
       </div>
     )
   }
   if (!authed) return <Login />
 
   return (
-    <Layout className="app">
+    <div className="app">
       <Sidebar />
-      <Layout className="content">{view === 'settings' ? <Settings /> : <Chat />}</Layout>
-    </Layout>
+      <div className="content">{view === 'settings' ? <Settings /> : <Chat />}</div>
+      <ToastHost />
+    </div>
   )
 }
