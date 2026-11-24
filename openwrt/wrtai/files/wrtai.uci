@@ -1,0 +1,10 @@
+# /etc/config/wrtai — WRT AI 默认配置
+# enabled/port 由 LuCI（luci-app-wrtai）管理；模型服务等其余选项
+# 由 WRT AI 自己的 Web 界面（路由器IP:端口）管理。
+
+config wrtai 'main'
+	option enabled '1'
+	option port '8765'
+	option listen '0.0.0.0'
+	option confirm_write '1'
+	option default_provider ''

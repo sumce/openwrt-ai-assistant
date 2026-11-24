@@ -1,7 +1,7 @@
 # Go
-wrtai
-wrtai.exe
-dist/
+/wrtai
+/wrtai.exe
+/dist/
 *.test
 
 # Frontend (keep tracked placeholder so `go build` works on fresh clone)
