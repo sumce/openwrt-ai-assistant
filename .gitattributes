@@ -1,0 +1,21 @@
+# Normalize line endings — shell scripts MUST stay LF or OpenWRT breaks
+* text=auto eol=lf
+
+*.sh text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+*.go text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+
+# Windows-only files
+*.bat text eol=crlf
+
+# Binary artifacts
+*.tar.gz binary
+*.png binary
+*.ico binary

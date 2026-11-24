@@ -1,0 +1,13 @@
+{
+	"admin/services/wrtai": {
+		"title": "WRT AI",
+		"order": 65,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": ["luci-app-wrtai"],
+			"uci": { "wrtai": true }
+		}
+	}
+}

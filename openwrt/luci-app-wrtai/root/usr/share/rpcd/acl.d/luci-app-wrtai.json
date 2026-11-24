@@ -1,0 +1,14 @@
+{
+	"luci-app-wrtai": {
+		"description": "Grant access to WRT AI settings",
+		"read": {
+			"uci": ["wrtai"]
+		},
+		"write": {
+			"uci": ["wrtai"],
+			"file": {
+				"/etc/init.d/wrtai": ["exec"]
+			}
+		}
+	}
+}

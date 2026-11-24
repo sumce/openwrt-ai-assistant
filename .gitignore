@@ -1,0 +1,18 @@
+# Go
+wrtai
+wrtai.exe
+dist/
+*.test
+
+# Frontend (keep tracked placeholder so `go build` works on fresh clone)
+web/node_modules/
+web/dist/*
+!web/dist/index.html
+
+# Dev data
+devdata/
+*.log
+
+# ZCode session files
+.zcode/
+*.exe~
